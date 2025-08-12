@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Tareas - Cerezos</title>
+  <meta name="theme-color" content="#fdf6f8" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cerezos">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons for UI elements -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  
+  <!-- SortableJS Library for Drag and Drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  
+  <!-- Google Fonts: Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-color: #fdf6f8;
+      --card-bg: rgba(255, 255, 255, 0.8);
+      --text-color: #3d3d3d;
+      --title-color: #c86b85;
+      --border-color: rgba(238, 173, 191, 0.4);
+      --primary-pink: #ea86a3;
+      --primary-hover: #e06c8e;
+      --priority-low: #5b9d99;
+      --priority-medium: #8cb369;
+      --priority-high: #e49273;
+      --priority-critical: #c1666b;
+      --event-exam: #ffadad;
+      --event-work: #a0c4ff;
+      --event-birthday: #bdb2ff;
+      --event-holiday: #ffc6ff;
+      --event-global: #caffbf;
+      --event-important: #fdffb6;
+    }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-image: url('https://images.pexels.com/photos/4057737/pexels-photo-4057737.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2');
+      background-size: cover; background-position: center; background-attachment: fixed;
+      color: var(--text-color); margin: 0; padding: 1rem;
+    }
+    .container { max-width: 1280px; margin: auto; display: grid; gap: 1.5rem; }
+    .card { background-color: var(--card-bg); padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border-color); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .input, select { border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.5); color: var(--text-color); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 14px; outline: none; transition: box-shadow 0.2s, border-color 0.2s; width: 100%; box-sizing: border-box; }
+    .input::placeholder { color: #8a8a8a; }
+    .input:focus { border-color: var(--primary-pink); box-shadow: 0 0 8px var(--primary-pink); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--primary-pink); background: var(--primary-pink); color: white; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .btn:hover { background: var(--primary-hover); box-shadow: 0 0 10px var(--primary-hover); }
+    .btn.cancel { background: transparent; border-color: #aaa; color: #555; }
+    .btn.cancel:hover { background: #eee; box-shadow: none; }
+    .btn-icon { padding: 4px; border-radius: 50%; border: none; background: transparent; color: #b48e9d; transition: all 0.2s; cursor: pointer; }
+    .btn-icon:hover { background-color: rgba(234, 134, 163, 0.1); color: var(--primary-pink); }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+    .kanban-board { display: flex; flex-direction: column; gap: 1.5rem; }
+    @media (min-width: 768px) { .kanban-board { flex-direction: row; } }
+    .kanban-column { flex: 1; transition: all 0.2s; }
+    .kanban-column .sortable-ghost { opacity: 0.6; background: rgba(234, 134, 163, 0.2); border-radius: 0.5rem; }
+    .kanban-column .sortable-chosen { cursor: grabbing; }
+    .kanban-task { padding: 0.75rem; border-radius: 0.5rem; cursor: grab; background-color: rgba(255, 255, 255, 0.5); border: 1px solid var(--border-color); transition: border-color 0.3s; }
+    .kanban-task:not([data-status="Hecho"]) { cursor: pointer; }
+    .modal-overlay, .focus-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 50; opacity: 0; transition: opacity 0.3s ease; }
+    .modal-overlay.active, .focus-overlay.active { display: flex; opacity: 1; }
+    .modal-content { width: 100%; max-width: 500px; }
+    .focus-overlay .card { width: 90%; max-width: 600px; text-align: center; }
+    h2 { font-weight: 700; color: var(--title-color); }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+    .calendar-grid > div { padding: 0.5rem 0; font-size: 0.875rem; }
+    .calendar-day { cursor: pointer; border-radius: 50%; position: relative; transition: background-color 0.2s; }
+    .calendar-day:hover { background-color: rgba(234, 134, 163, 0.2); }
+    .calendar-day.today { background-color: var(--primary-pink); color: white; }
+    .calendar-day.selected { border: 2px solid var(--primary-pink); }
+    .calendar-day .task-dot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; }
+    .calendar-day.other-month { color: #ccc; }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="app-container">
+    <div class="card">
+      <h2 class="text-xl mb-4">Gestor de Tareas 🌸</h2>
+      <div class="grid-form" id="filter-controls">
+        <select class="input" data-filter="status">
+          <option value="Todos">Todos los estados</option>
+          <option value="Por hacer">Por hacer</option>
+          <option value="En curso">En curso</option>
+          <option value="Hecho">Hecho</option>
+        </select>
+        <input type="text" placeholder="Buscar..." class="input" data-filter="query">
+        <input type="text" placeholder="Etiqueta..." class="input" data-filter="tag">
+        <select class="input" data-filter="priority">
+          <option value="Todos">Todas las prioridades</option>
+          <option value="Alta">Alta+</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="text-xl mb-4">Añadir tarea</h2>
+      <form id="task-form">
+        <div class="grid-form">
+          <input type="text" name="title" placeholder="Título" class="input lg-span-2" required>
+          <select name="eventType" class="input"></select>
+          <select name="priority" class="input">
+            <option value="Baja">Baja</option>
+            <option value="Media" selected>Media</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+          </select>
+          <input type="date" name="dueDate" class="input">
+          <input type="time" name="startTime" class="input">
+          <input type="text" name="tags" placeholder="Etiquetas (coma)" class="input">
+          <textarea name="notes" placeholder="Notas" class="input lg-span-2" rows="1"></textarea>
+        </div>
+        <button type="submit" class="btn mt-4"><i data-lucide="plus" class="w-4 h-4 mr-1"></i> Añadir</button>
+      </form>
+    </div>
+
+    <div class="kanban-board" id="kanban-board"></div>
+    <div class="card" id="calendar-section-card"></div>
+    <div class="card" id="grades-card"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card" id="summary-card"></div>
+      <div class="card" id="pomodoro-card"></div>
+    </div>
+
+    <footer class="text-center text-xs text-white font-semibold py-4" style="text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+      Datos guardados en este dispositivo (localStorage).
+    </footer>
+  </div>
+
+  <div class="modal-overlay" id="edit-modal" aria-hidden="true">
+    <div class="card modal-content">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl">Editar Tarea</h2>
+        <button class="btn-icon" id="close-modal-btn" aria-label="Cerrar">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="edit-task-form" class="space-y-4">
+        <input type="hidden" name="id">
+        <input type="text" name="title" class="input" placeholder="Título" required>
+        <textarea name="notes" class="input" placeholder="Notas" rows="3"></textarea>
+        <div class="grid grid-cols-2 gap-4">
+          <select name="eventType" class="input"></select>
+          <select name="priority" class="input">
+            <option value="Baja">Baja</option>
+            <option value="Media">Media</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+          </select>
+          <input type="date" name="dueDate" class="input">
+          <input type="time" name="startTime" class="input">
+        </div>
+        <input type="text" name="tags" class="input" placeholder="Etiquetas (coma)">
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn cancel" id="cancel-edit-btn">Cancelar</button>
+          <button type="submit" class="btn">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="focus-overlay" id="focus-mode" aria-hidden="true">
+      <div class="card">
+          <h2 class="text-2xl mb-2" id="focus-task-title"></h2>
+          <p class="text-gray-500 mb-6">Concéntrate en esta tarea.</p>
+          <div id="focus-pomodoro-container"></div>
+          <button class="btn cancel mt-8" id="exit-focus-btn">Salir del modo concentración</button>
+      </div>
+  </div>
+
+  <!-- Registrar SW -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let tasks = JSON.parse(localStorage.getItem('tasks-v2') || '[]');
+      let grades = JSON.parse(localStorage.getItem('grades-v1') || '[]');
+      let filters = { status: 'Todos', query: '', tag: '', priority: 'Todos' };
+      let pomodoroState = { timerId: null, timeRemaining: 25 * 60, isRunning: false, currentTask: null };
+      let calendarState = { date: new Date(), selectedDate: null };
+
+      const save = () => { localStorage.setItem('tasks-v2', JSON.stringify(tasks)); render(); };
+      const saveGrades = () => { localStorage.setItem('grades-v1', JSON.stringify(grades)); render(); };
+
+      const STATUSES = ['Por hacer','En curso','Hecho'];
+      const EVENT_TYPES = {'Examen':'var(--event-exam)','Trabajo':'var(--event-work)','Cumpleaños':'var(--event-birthday)','Día no lectivo':'var(--event-holiday)','Trimestrales/Globales':'var(--event-global)','Entrega de notas/Eventos':'var(--event-important)'};
+      const STATUS_DETAILS = {"Por hacer": { titleColor: 'text-pink-500' }, "En curso": { titleColor: 'text-orange-500' }, "Hecho": { titleColor: 'text-green-600' }};
+      const PRIORITIES = {
+        Baja:{label:'Baja',style:`background-color: rgba(91,157,153,.1); color: var(--priority-low); border:1px solid var(--priority-low);`},
+        Media:{label:'Media',style:`background-color: rgba(140,179,105,.1); color: var(--priority-medium); border:1px solid var(--priority-medium);`},
+        Alta:{label:'Alta',style:`background-color: rgba(228,146,115,.1); color: var(--priority-high); border:1px solid var(--priority-high);`},
+        Crítica:{label:'Crítica',style:`background-color: rgba(193,102,107,.1); color: var(--priority-critical); border:1px solid var(--priority-critical);`}
+      };
+
+      const getFilteredTasks = () => tasks.filter(t => !t.eventType && (filters.status==='Todos'||t.status===filters.status) &&
+        (!filters.query || t.title.toLowerCase().includes(filters.query.toLowerCase()) || (t.notes||'').toLowerCase().includes(filters.query.toLowerCase())) &&
+        (!filters.tag || (t.tags||[]).join(' ').toLowerCase().includes(filters.tag.toLowerCase())) &&
+        (filters.priority==='Todos' || (filters.priority==='Alta' ? ['Alta','Crítica'].includes(t.priority) : t.priority===filters.priority)) );
+
+      const renderKanbanTask = (task) => {
+        const p = PRIORITIES[task.priority] || PRIORITIES.Media;
+        return `
+          <div class="kanban-task" data-task-id="${task.id}" data-status="${task.status}">
+            <p class="font-bold text-sm text-gray-700">${task.title}</p>
+            ${task.notes ? `<p class="text-xs text-gray-500 mt-2"><i data-lucide="file-text" class="inline-block w-3 h-3 mr-1"></i>${task.notes}</p>` : ''}
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-2">
+              ${task.dueDate ? `<div class="flex items-center"><i data-lucide="calendar" class="w-3 h-3 mr-1"></i><span>${task.dueDate}</span></div>` : ''}
+              ${task.startTime || task.endTime ? `<div class="flex items-center"><i data-lucide="clock" class="w-3 h-3 mr-1"></i><span>${task.startTime || ''} - ${task.endTime || ''}</span></div>` : ''}
+            </div>
+            <div class="flex justify-between items-center mt-3 pt-2 border-t border-gray-200">
+              <span class="pill" style="${p.style}">${p.label}</span>
+              <div class="flex gap-1">
+                <button class="btn-icon" data-action="edit" data-task-id="${task.id}"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                <button class="btn-icon" data-action="delete" data-task-id="${task.id}"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+          </div>`;
+      };
+
+      const renderKanbanBoard = () => {
+        const filtered = getFilteredTasks();
+        const board = document.getElementById('kanban-board');
+        if (filtered.length===0 && tasks.filter(t=>!t.eventType).length===0) { board.innerHTML = `<div class="card text-center w-full py-10 text-gray-500">Aún no hay tareas. ¡Añade una para empezar!</div>`; return; }
+        const cols = STATUSES.map(s => {
+          const items = filtered.filter(t => t.status===s);
+          const c = STATUS_DETAILS[s]?.titleColor || '';
+          return `<div class="card kanban-column"><h3 class="font-bold mb-3 text-center ${c}">${s} <span class="text-xs bg-gray-200 text-gray-500 font-semibold rounded-full px-2 py-0.5">${items.length}</span></h3><div class="space-y-3 min-h-[100px]" data-column-body="true" data-status="${s}">${items.map(renderKanbanTask).join('')}</div></div>`;
+        }).join('');
+        board.innerHTML = cols;
+      };
+
+      const renderSummary = () => {
+        const actual = tasks.filter(t => !t.eventType);
+        const doneToday = actual.filter(t => t.status==='Hecho' && (t.completedAt||'').slice(0,10)===new Date().toISOString().slice(0,10)).length;
+        const pending = actual.filter(t => t.status!=='Hecho').length;
+        document.getElementById('summary-card').innerHTML = `<h2 class="text-xl mb-4">Resumen diario</h2><div class="grid grid-cols-2 gap-x-4 gap-y-2 text-gray-600 text-sm"><span>Tareas Hechas: <b style="color: var(--priority-medium);">${doneToday}</b></span><span>Tareas Pendientes: <b style="color: var(--priority-high);">${pending}</b></span></div>`;
+      };
+
+      const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+      const renderPomodoro = (container, large=false) => {
+        const sizeClass = large ? 'text-8xl md:text-9xl' : 'text-7xl';
+        container.innerHTML = `<div class="text-center">${!large ? `<h2 class="text-xl mb-4">Temporizador Pomodoro</h2>` : ''}<div class="pomodoro-time ${sizeClass} font-bold" style="color: var(--primary-pink);">${formatTime(pomodoroState.timeRemaining)}</div><div class="flex justify-center gap-2 mt-4"><button class="btn pomodoro-start-pause">${pomodoroState.isRunning ? 'Pausar':'Iniciar'}</button><button class="btn cancel pomodoro-reset">Reiniciar</button></div></div>`;
+      };
+
+      const renderCalendar = () => {
+        const container = document.getElementById('calendar-section-card');
+        container.innerHTML = `<h2 class="text-xl mb-4">Calendario Académico</h2><p class="text-sm text-gray-600">Ejemplo mínimo. (Puedo restaurar tu calendario completo si lo quieres aquí.)</p>`;
+      };
+
+      const initDragAndDrop = () => {
+        document.querySelectorAll('[data-column-body]').forEach(col => {
+          new Sortable(col, {group:'kanban', animation:150, onEnd: (evt)=>{
+            const id = evt.item.dataset.taskId; const st = evt.to.dataset.status;
+            const t = tasks.find(x=>x.id===id); if (t && t.status!==st){ t.status = st; if (st==='Hecho') t.completedAt = new Date().toISOString(); save(); }
+          }});
+        });
+      };
+
+      const render = () => {
+        renderKanbanBoard(); renderSummary(); renderCalendar(); renderPomodoro(document.getElementById('pomodoro-card')); initDragAndDrop();
+        if (typeof lucide!=='undefined') lucide.createIcons();
+      };
+
+      document.getElementById('task-form').addEventListener('submit', e => {
+        e.preventDefault(); const f = new FormData(e.target);
+        tasks.unshift({ id:`task-${Date.now()}`, title:f.get('title'), dueDate:f.get('dueDate'), startTime:f.get('startTime'), endTime:f.get('endTime'), priority:f.get('priority'), eventType:f.get('eventType'), tags:(f.get('tags')||'').split(',').map(t=>t.trim()).filter(Boolean), notes:f.get('notes'), status:'Por hacer', createdAt:new Date().toISOString() });
+        e.target.reset(); save();
+      });
+
+      document.getElementById('filter-controls').addEventListener('input', e => { if (e.target.dataset.filter){ filters[e.target.dataset.filter]=e.target.value; render(); } });
+
+      const modal = document.getElementById('edit-modal'); const form = document.getElementById('edit-task-form');
+      document.getElementById('kanban-board').addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]'); if (!btn) return;
+        const id = btn.dataset.taskId; const action = btn.dataset.action;
+        if (action==='delete'){ tasks = tasks.filter(t=>t.id!==id); save(); }
+        if (action==='edit'){ const t = tasks.find(t=>t.id===id); if (t){ form.elements['id'].value=t.id; form.elements['title'].value=t.title; form.elements['notes'].value=t.notes||''; form.elements['dueDate'].value=t.dueDate||''; form.elements['startTime'].value=t.startTime||''; form.elements['endTime'].value=t.endTime||''; form.elements['priority'].value=t.priority; modal.classList.add('active'); modal.setAttribute('aria-hidden','false'); } }
+      });
+      form.addEventListener('submit', e => { e.preventDefault(); const f=new FormData(e.target); const id=f.get('id'); const i=tasks.findIndex(t=>t.id===id); if (i>-1){ tasks[i]={...tasks[i], title:f.get('title'), notes:f.get('notes'), dueDate:f.get('dueDate'), priority:f.get('priority'), startTime:f.get('startTime'), endTime:f.get('endTime')}; save(); close(); } });
+      const close = () => { modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); };
+      document.getElementById('close-modal-btn').addEventListener('click', close);
+      document.getElementById('cancel-edit-btn').addEventListener('click', close);
+      modal.addEventListener('click', (e)=>{ if(e.target===modal) close(); });
+
+      // Pomodoro
+      const tick = () => { pomodoroState.timeRemaining--; document.querySelectorAll('.pomodoro-time').forEach(el=>el.textContent = formatTime(pomodoroState.timeRemaining)); if (pomodoroState.timeRemaining<=0){ clearInterval(pomodoroState.timerId); pomodoroState.isRunning=false; pomodoroState.timeRemaining=25*60; renderPomodoro(document.getElementById('pomodoro-card')); } };
+      document.body.addEventListener('click', e => { if (e.target.matches('.pomodoro-start-pause')){ pomodoroState.isRunning=!pomodoroState.isRunning; if (pomodoroState.isRunning){ pomodoroState.timerId=setInterval(tick,1000);} else { clearInterval(pomodoroState.timerId);} renderPomodoro(document.getElementById('pomodoro-card')); } if (e.target.matches('.pomodoro-reset')){ clearInterval(pomodoroState.timerId); pomodoroState.isRunning=false; pomodoroState.timeRemaining=25*60; renderPomodoro(document.getElementById('pomodoro-card')); } });
+
+      // Inicializa
+      const dropdowns = document.querySelectorAll('select[name="eventType"]');
+      dropdowns.forEach(d => d.innerHTML = `<option value="">Tarea (sin evento)</option>` + Object.keys(EVENT_TYPES).filter(x=>x!=='Día no lectivo').map(x=>`<option value="${x}">${x}</option>`).join(''));
+      render();
+    });
+  </script>
+</body>
+</html>
